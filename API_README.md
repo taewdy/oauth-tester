@@ -1,6 +1,6 @@
-# Photos API
+# OAuth Tester
 
-A FastAPI service that fetches photos from the JSONPlaceholder API, built following Python best practices and functional organization patterns.
+An HTTPS OAuth/OIDC tester built with FastAPI, following Python best practices and a `src/` layout. It performs Authorization Code with PKCE, then displays ID token (JWT), access token, and parsed claims in a minimal UI.
 
 ## 🏗️ Architecture
 
@@ -9,92 +9,38 @@ This project follows the **functional organization pattern** recommended for Pyt
 ### Project Structure
 
 ```
-src/photos_api/
-├── api/              # FastAPI endpoints and routing
-│   ├── __init__.py
-│   └── photos.py     # Photos endpoints
-├── app/              # FastAPI application factory
-│   ├── __init__.py
-│   └── factory.py    # App creation and configuration
-├── http/             # HTTP transport (generic)
-│   ├── __init__.py
-│   └── client.py     # Low-level HTTP helpers (e.g., get_json)
-├── photos/           # Photos domain (business)
-│   ├── __init__.py
-│   ├── service.py    # Orchestration: compose gateway + mappers + validators
-│   ├── gateway.py    # External API adapter (I/O only, returns raw data)
-│   ├── mappers.py    # Raw -> Photo model mapping
-│   └── validators.py # Domain validation hooks
-├── models/           # Pydantic data models
-│   ├── __init__.py
-│   └── photo.py      # Photo model definition
-├── __init__.py
-└── main.py          # Application entry point
+src/oauth_tester/
+├── app/              # FastAPI application factory (CORS, sessions, routing)
+├── routes/           # /auth login/callback/logout
+├── templates/        # Minimal Jinja UI to display tokens/claims
+├── oauth_client.py   # Authlib OAuth client registration (discovery/manual)
+├── jwt_utils.py      # JWKS fetch + JWT validation helpers
+├── security.py       # PKCE/state/nonce helpers
+├── settings/         # Typed settings via pydantic-settings
+└── main.py           # Entrypoint (TLS enabled via env)
 ```
 
 ## 🚀 Features
 
-- **GET /photos/** - Fetch all photos with optional limit parameter
-- **GET /photos/{photo_id}** - Fetch a single photo by ID
-- **GET /health** - Health check endpoint
-- **GET /** - Root endpoint with API information
-- **Interactive API Documentation** - Available at `/docs`
-- **Metrics** - Prometheus metrics at `/metrics`
-- **Proper Error Handling** - HTTP status codes and error messages
-- **Type Safety** - Full type hints and Pydantic validation
+- Authorization Code + PKCE (S256), state, nonce
+- OIDC discovery or manual endpoints
+- Local HTTPS with self-signed certs
+- Minimal UI for ID/access token viewing and claims parsing
+- Type safety and clean structure
 
-## 📋 API Endpoints
+## 📋 Endpoints
 
-### GET /v1/photos/
-
-Fetch photos from JSONPlaceholder API.
-
-**Parameters:**
-- `limit` (optional): Limit number of photos returned (1-5000)
-
-**Example:**
-```bash
-curl -X GET "http://localhost:8000/v1/photos/?limit=3"
-```
-
-**Response:**
-```json
-[
-  {
-    "albumId": 1,
-    "id": 1,
-    "title": "accusamus beatae ad facilis cum similique qui sunt",
-    "url": "https://via.placeholder.com/600/92c952",
-    "thumbnailUrl": "https://via.placeholder.com/150/92c952"
-  }
-]
-```
-
-### GET /v1/photos/{photo_id}
-
-Fetch a single photo by ID.
-
-**Example:**
-```bash
-curl -X GET "http://localhost:8000/v1/photos/42"
-```
-
-**Response:**
-```json
-{
-  "albumId": 1,
-  "id": 42,
-  "title": "Mock photo 42 - sample title for testing",
-  "url": "https://via.placeholder.com/600/mock0042",
-  "thumbnailUrl": "https://via.placeholder.com/150/mock0042"
-}
-```
+- `GET /` — UI page showing buttons and token/claims after login
+- `GET /auth/login` — starts the OAuth flow
+- `GET /auth/callback` — handles authorization code exchange
+- `GET|POST /auth/logout` — clears session
+- `GET /health` — health status
 
 ## 🛠️ Setup and Installation
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - [uv](https://docs.astral.sh/uv/) for dependency management
 
 ### Installation
@@ -109,15 +55,21 @@ curl -X GET "http://localhost:8000/v1/photos/42"
    uv sync
    ```
 
-3. **Run the application:**
+3. **Generate TLS certs:**
    ```bash
-   uv run uvicorn photos_api.main:app --host 0.0.0.0 --port 8000
+   make certs
+   ```
+
+4. **Run the application:**
+   ```bash
+   make run
+   # serves https://localhost:8000
    ```
 
 4. **Access the API:**
-   - API Base URL: http://localhost:8000
-   - Interactive Documentation: http://localhost:8000/docs
-   - Health Check: http://localhost:8000/health
+- Base URL: https://localhost:8000
+- Docs: https://localhost:8000/docs
+- Health: https://localhost:8000/health
 
 ## 🧪 Testing
 

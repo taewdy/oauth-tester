@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OAuth Tester</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
+      .row { display: flex; gap: 1rem; align-items: center; }
+      textarea, pre { width: 100%; min-height: 140px; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+      code { user-select: all; }
+      button { padding: 0.5rem 0.75rem; }
+      .muted { color: #666; font-size: 0.9rem; }
+    </style>
+  </head>
+  <body>
+    <h1>OAuth Tester</h1>
+    {% if not id_token %}
+      <div class="card">
+        <p>Sign in to start the OAuth flow and view the resulting JWT tokens.</p>
+        <a href="/auth/login"><button>Login with Provider</button></a>
+      </div>
+    {% else %}
+      <div class="row">
+        <form action="/auth/logout" method="post"><button>Logout</button></form>
+        <a href="/auth/login"><button>Login Again</button></a>
+      </div>
+      <div class="card">
+        <h3>ID Token (JWT)</h3>
+        <textarea readonly id="id-token">{{ id_token }}</textarea>
+        <div class="muted">Copy and paste into jwt.io or similar to inspect.</div>
+      </div>
+      {% if access_token %}
+      <div class="card">
+        <h3>Access Token</h3>
+        <textarea readonly id="access-token">{{ access_token }}</textarea>
+      </div>
+      {% endif %}
+      {% if claims_json %}
+      <div class="card">
+        <h3>Parsed ID Token Claims</h3>
+        <pre id="claims">{{ claims_json }}</pre>
+      </div>
+      {% endif %}
+    {% endif %}
+  </body>
+  </html>
+

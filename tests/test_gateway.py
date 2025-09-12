@@ -1,37 +1,15 @@
 import pytest
-import respx
 import httpx
+from httpx import AsyncClient
 
-from photos_api.photos import gateway
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_list_photos_success(monkeypatch):
-    # Point base URL to test server
-    from photos_api.settings import get_settings
-
-    get_settings.cache_clear()  # type: ignore[attr-defined]
-    s = get_settings()
-    # Keep real base URL; respx intercepts absolute URL below
-
-    route = respx.get("https://jsonplaceholder.typicode.com/photos").mock(
-        return_value=httpx.Response(200, json=[{"albumId": 1, "id": 1, "title": "t", "url": "u", "thumbnailUrl": "tu"}])
-    )
-
-    data = await gateway.list_photos()
-    assert route.called
-    assert isinstance(data, list)
-    assert data[0]["id"] == 1
+from oauth_tester.app import create_app
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_get_photo_404_raises():
-    route = respx.get("https://jsonplaceholder.typicode.com/photos/9999").mock(
-        return_value=httpx.Response(404)
-    )
-    with pytest.raises(httpx.HTTPStatusError):
-        await gateway.get_photo(9999)
-    assert route.called
-
+async def test_logout_redirect():
+    app = create_app()
+    transport = httpx.ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
+        resp = await ac.get("/auth/logout")
+        assert resp.status_code in (302, 307, 303)
+        assert resp.headers.get("location") == "/"

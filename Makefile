@@ -6,6 +6,7 @@ help:
 	@echo "  install      - Install production dependencies"
 	@echo "  install-dev  - Install development dependencies"
 	@echo "  run          - Run the FastAPI development server"
+	@echo "  certs        - Generate local self-signed TLS certs in certs/"
 	@echo "  run-prod     - Run the server using app settings"
 	@echo "  test         - Run tests"
 	@echo "  lint         - Run all linting tools (format, type-check)"
@@ -25,11 +26,20 @@ install-dev:
 
 # Run the FastAPI development server
 run:
-	uv run uvicorn photos_api.main:app --reload --host 0.0.0.0 --port 8000
+	uv run uvicorn oauth_tester.main:app --reload --host 0.0.0.0 --port 8000
 
 # Run the server using main entry (uses settings)
 run-prod:
-	uv run python -m photos_api.main
+	uv run python -m oauth_tester.main
+
+# Generate local self-signed TLS certs for https://localhost:8000
+certs:
+	mkdir -p certs
+	openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+	  -keyout certs/localhost.key -out certs/localhost.crt \
+	  -subj "/CN=localhost" \
+	  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+	@echo "Generated certs/localhost.crt and certs/localhost.key"
 
 # Run tests
 test:
@@ -37,7 +47,7 @@ test:
 
 # Run tests with coverage
 test-cov:
-	uv run pytest --cov=photos_api --cov-report=html --cov-report=term
+	uv run pytest --cov=oauth_tester --cov-report=html --cov-report=term
 
 # Format code with black and isort
 format:
@@ -84,8 +94,9 @@ setup: install-dev
 	@echo "Run 'make run' to start the development server"
 
 # Show project info
+
 info:
-	@echo "Project: photos-api"
+	@echo "Project: oauth-tester"
 	@echo "Python: >=3.11"
 	@echo "Package Manager: uv"
 	@echo "Framework: FastAPI"

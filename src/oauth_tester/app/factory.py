@@ -1,8 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from starlette.middleware.sessions import SessionMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-from photos_api.api import photos_router
-from photos_api.settings import get_settings
+from oauth_tester.settings import get_settings
+from oauth_tester.routes import auth_router
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+templates = Jinja2Templates(directory=str(BASE_DIR / "oauth_tester" / "templates"))
 
 
 def create_app() -> FastAPI:
@@ -16,7 +25,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.app_name,
-        description="A FastAPI service for fetching photos from JSONPlaceholder API",
+        description="Local HTTPS OAuth/OIDC tester",
         version=settings.app_version,
         docs_url="/docs",
         redoc_url="/redoc",
@@ -31,26 +40,42 @@ def create_app() -> FastAPI:
         allow_methods=settings.cors.methods(),
         allow_headers=settings.cors.headers(),
     )
-    
-    # Include routers under API version prefix
-    app.include_router(photos_router, prefix="/v1")
+
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.oauth.secret_key,
+        session_cookie=settings.oauth.session_cookie_name,
+        same_site="lax",
+        https_only=True,
+    )
+
+    static_dir = BASE_DIR / "oauth_tester" / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    # Include OAuth routes
+    app.include_router(auth_router)
     
     # Health check endpoint
     @app.get("/health")
     async def health_check() -> dict:
         """Health check endpoint."""
-        return {"status": "healthy", "service": "photos-api"}
+        return {"status": "healthy", "service": "oauth-tester"}
     
     # Root endpoint
-    @app.get("/")
-    async def root() -> dict:
-        """Root endpoint with API information."""
-        return {
-            "message": settings.app_name,
-            "version": settings.app_version,
-            "docs": "/docs",
-            "health": "/health",
-        }
+    @app.get("/", response_class=HTMLResponse)
+    async def index(request: Request):
+        import json
+        claims = request.session.get("claims")
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "id_token": request.session.get("id_token"),
+                "access_token": request.session.get("access_token"),
+                "claims_json": json.dumps(claims, indent=2) if claims else None,
+            },
+        )
 
     # Exception handlers (centralized)
     import httpx
@@ -71,7 +96,7 @@ def create_app() -> FastAPI:
     from starlette.requests import Request
     from starlette.responses import Response
 
-    logger = logging.getLogger("photos_api")
+    logger = logging.getLogger("oauth_tester")
 
     class RequestIDMiddleware(BaseHTTPMiddleware):
         def __init__(self, app, header_name: str = "X-Request-ID"):

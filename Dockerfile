@@ -18,10 +18,9 @@ RUN pip install --no-cache-dir uv && \
 
 EXPOSE 8000
 
-ENV PHOTOS_API_SERVER__HOST=0.0.0.0 \
-    PHOTOS_API_SERVER__PORT=8000 \
-    PHOTOS_API_SERVER__RELOAD=false \
-    PHOTOS_API_SERVER__LOG_LEVEL=info
+ENV OAUTH_TESTER_SERVER__HOST=0.0.0.0 \
+    OAUTH_TESTER_SERVER__PORT=8000 \
+    OAUTH_TESTER_SERVER__RELOAD=false \
+    OAUTH_TESTER_SERVER__LOG_LEVEL=info
 
-CMD ["uv", "run", "python", "-m", "photos_api.main"]
-
+CMD ["uv", "run", "python", "-m", "oauth_tester.main"]

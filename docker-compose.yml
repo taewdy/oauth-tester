@@ -1,13 +1,17 @@
 version: "3.9"
 services:
-  photos-api:
+  oauth-tester:
     build: .
     ports:
       - "8000:8000"
     environment:
-      PHOTOS_API_SERVER__HOST: 0.0.0.0
-      PHOTOS_API_SERVER__PORT: 8000
-      PHOTOS_API_SERVER__RELOAD: "false"
-      PHOTOS_API_SERVER__LOG_LEVEL: info
-      PHOTOS_API_EXTERNAL__BASE_URL: https://jsonplaceholder.typicode.com
-      PHOTOS_API_EXTERNAL__HTTP_TIMEOUT: 20
+      OAUTH_TESTER_SERVER__HOST: 0.0.0.0
+      OAUTH_TESTER_SERVER__PORT: 8000
+      OAUTH_TESTER_SERVER__RELOAD: "false"
+      OAUTH_TESTER_SERVER__LOG_LEVEL: info
+      # Example TLS and OAuth settings
+      # OAUTH_TESTER_OAUTH__BASE_URL: https://localhost:8000
+      # OAUTH_TESTER_OAUTH__REDIRECT_PATH: /auth/callback
+      # OAUTH_TESTER_OAUTH__CLIENT_ID: your-client-id
+      # OAUTH_TESTER_OAUTH__CLIENT_SECRET: your-client-secret
+      # OAUTH_TESTER_OAUTH__OIDC_DISCOVERY_URL: https://your-issuer/.well-known/openid-configuration

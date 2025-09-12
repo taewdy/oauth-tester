@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version as pkg_version
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def _package_version(default: str = "0.1.0") -> str:
     try:
-        return pkg_version("photos-api")
+        return pkg_version("oauth-tester")
     except PackageNotFoundError:
         return default
 
@@ -45,11 +45,33 @@ class CorsSettings(BaseModel):
         return [part.strip() for part in value.split(",") if part.strip()]
 
 
-class ExternalSettings(BaseModel):
-    base_url: HttpUrl = HttpUrl("https://jsonplaceholder.typicode.com")
-    http_timeout: float = 30.0
-    max_retries: int = 2
-    backoff_factor: float = 0.2
+class OAuthSettings(BaseModel):
+    # Frontend/base URL and redirect path
+    base_url: HttpUrl = HttpUrl("https://localhost:8000")
+    redirect_path: str = "/auth/callback"
+
+    # Provider info
+    provider_name: str = "thread"
+    scopes: str = "openid profile email"
+    oidc_discovery_url: Optional[str] = None
+
+    # Manual endpoints if discovery is unavailable
+    authorize_url: Optional[str] = None
+    token_url: Optional[str] = None
+    jwks_url: Optional[str] = None
+    userinfo_endpoint: Optional[str] = None
+
+    # OAuth client
+    client_id: str = ""
+    client_secret: Optional[str] = None
+
+    # Sessions/crypto
+    secret_key: str = "dev-secret-change-me"
+    session_cookie_name: str = "oauth_tester_session"
+
+    # Local TLS certs (required by provider Thread)
+    ssl_certfile: Optional[str] = None
+    ssl_keyfile: Optional[str] = None
 
 
 class LoggingSettings(BaseModel):
@@ -60,17 +82,17 @@ class Settings(BaseSettings):
     """Application settings loaded from environment (and .env)."""
 
     # App metadata
-    app_name: str = "Photos API"
+    app_name: str = "OAuth Tester"
     app_version: str = Field(default_factory=_package_version)
 
     # Groups
     server: ServerSettings = ServerSettings()
     cors: CorsSettings = CorsSettings()
-    external: ExternalSettings = ExternalSettings()
+    oauth: OAuthSettings = OAuthSettings()
     logging: LoggingSettings = LoggingSettings()
 
     model_config = SettingsConfigDict(
-        env_prefix="PHOTOS_API_",
+        env_prefix="OAUTH_TESTER_",
         env_nested_delimiter="__",
         env_file=".env",
         case_sensitive=False,
