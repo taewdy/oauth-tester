@@ -51,8 +51,8 @@ class OAuthSettings(BaseModel):
     redirect_path: str = "/auth/callback"
 
     # Provider info
-    provider_name: str = "thread"
-    scopes: str = "openid profile email"
+    provider_name: str = "threads"
+    scopes: str = "threads_basic"
     oidc_discovery_url: Optional[str] = None
 
     # Manual endpoints if discovery is unavailable
@@ -60,10 +60,13 @@ class OAuthSettings(BaseModel):
     token_url: Optional[str] = None
     jwks_url: Optional[str] = None
     userinfo_endpoint: Optional[str] = None
+    userinfo_fields: Optional[str] = None  # e.g., "id,name"
 
     # OAuth client
     client_id: str = ""
     client_secret: Optional[str] = None
+    use_pkce: bool = False  # Threads docs do not require PKCE
+    compute_appsecret_proof: bool = False  # Only for providers that require it
 
     # Sessions/crypto
     secret_key: str = "dev-secret-change-me"

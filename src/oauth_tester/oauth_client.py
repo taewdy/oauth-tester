@@ -28,12 +28,19 @@ def register_oidc_client(name: Optional[str] = None) -> None:
         if s.oauth.userinfo_endpoint:
             metadata_args["userinfo_endpoint"] = s.oauth.userinfo_endpoint
 
+    client_kwargs = {
+        "scope": s.oauth.scopes,
+    }
+    # For Threads/Meta and many non-OIDC providers, the token endpoint expects
+    # client_id/client_secret in the POST body, not Basic auth.
+    # Force client_secret_post when not using discovery or when provider is threads.
+    if not s.oauth.oidc_discovery_url or s.oauth.provider_name.lower() == "threads":
+        client_kwargs["token_endpoint_auth_method"] = "client_secret_post"
+
     oauth.register(
         name=provider,
         client_id=s.oauth.client_id,
         client_secret=s.oauth.client_secret,
-        client_kwargs={
-            "scope": s.oauth.scopes,
-        },
+        client_kwargs=client_kwargs,
         **metadata_args,
     )

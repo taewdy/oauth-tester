@@ -16,9 +16,15 @@
   </head>
   <body>
     <h1>OAuth Tester</h1>
-    {% if not id_token %}
+    {% if request.session.get('auth_error') %}
+      <div class="card" style="border-color:#e00;background:#fee;">
+        <h3>Authorization Error</h3>
+        <pre>{{ request.session.get('auth_error') | tojson(indent=2) }}</pre>
+      </div>
+    {% endif %}
+    {% if not id_token and not access_token %}
       <div class="card">
-        <p>Sign in to start the OAuth flow and view the resulting JWT tokens.</p>
+        <p>Sign in to start the OAuth flow and view the resulting token(s).</p>
         <a href="/auth/login"><button>Login with Provider</button></a>
       </div>
     {% else %}
@@ -26,11 +32,13 @@
         <form action="/auth/logout" method="post"><button>Logout</button></form>
         <a href="/auth/login"><button>Login Again</button></a>
       </div>
-      <div class="card">
-        <h3>ID Token (JWT)</h3>
-        <textarea readonly id="id-token">{{ id_token }}</textarea>
-        <div class="muted">Copy and paste into jwt.io or similar to inspect.</div>
-      </div>
+      {% if id_token %}
+        <div class="card">
+          <h3>ID Token (JWT)</h3>
+          <textarea readonly id="id-token">{{ id_token }}</textarea>
+          <div class="muted">Copy and paste into jwt.io or similar to inspect.</div>
+        </div>
+      {% endif %}
       {% if access_token %}
       <div class="card">
         <h3>Access Token</h3>
@@ -43,7 +51,12 @@
         <pre id="claims">{{ claims_json }}</pre>
       </div>
       {% endif %}
+      {% if request.session.get('profile') %}
+      <div class="card">
+        <h3>User Profile</h3>
+        <pre id="profile">{{ request.session.get('profile') | tojson(indent=2) }}</pre>
+      </div>
+      {% endif %}
     {% endif %}
   </body>
   </html>
-

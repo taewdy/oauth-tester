@@ -19,6 +19,11 @@ def main() -> None:
     ssl_kwargs = {}
     if s.oauth.ssl_certfile and s.oauth.ssl_keyfile:
         ssl_kwargs = {"ssl_certfile": s.oauth.ssl_certfile, "ssl_keyfile": s.oauth.ssl_keyfile}
+        print(
+            f"[oauth-tester] TLS enabled: cert={s.oauth.ssl_certfile} key={s.oauth.ssl_keyfile} base_url={s.oauth.base_url}"
+        )
+    else:
+        print("[oauth-tester] TLS DISABLED: serving HTTP. Set OAUTH_TESTER_OAUTH__SSL_CERTFILE and __SSL_KEYFILE.")
 
     uvicorn.run(
         "oauth_tester.main:app",

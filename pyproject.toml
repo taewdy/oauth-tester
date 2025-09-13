@@ -37,7 +37,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = [{include = "oauth_tester", from = "src"}]
+packages = ["src/oauth_tester"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/oauth_tester", "README.md", "pyproject.toml", "Makefile", "Dockerfile"]

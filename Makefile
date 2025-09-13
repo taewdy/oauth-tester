@@ -7,6 +7,7 @@ help:
 	@echo "  install-dev  - Install development dependencies"
 	@echo "  run          - Run the FastAPI development server"
 	@echo "  certs        - Generate local self-signed TLS certs in certs/"
+	@echo "  certs-mkcert - Generate locally trusted certs via mkcert"
 	@echo "  run-prod     - Run the server using app settings"
 	@echo "  test         - Run tests"
 	@echo "  lint         - Run all linting tools (format, type-check)"
@@ -26,7 +27,8 @@ install-dev:
 
 # Run the FastAPI development server
 run:
-	uv run uvicorn oauth_tester.main:app --reload --host 0.0.0.0 --port 8000
+	# Use module entrypoint so SSL from env is applied
+	uv run python -m oauth_tester.main
 
 # Run the server using main entry (uses settings)
 run-prod:
@@ -40,6 +42,14 @@ certs:
 	  -subj "/CN=localhost" \
 	  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 	@echo "Generated certs/localhost.crt and certs/localhost.key"
+
+# Generate trusted local certs using mkcert (recommended)
+# Requires: https://github.com/FiloSottile/mkcert installed
+certs-mkcert:
+	mkdir -p certs
+	mkcert -install
+	mkcert -key-file certs/localhost.key -cert-file certs/localhost.crt localhost 127.0.0.1 ::1
+	@echo "Generated locally trusted certs/localhost.crt and certs/localhost.key"
 
 # Run tests
 test:
