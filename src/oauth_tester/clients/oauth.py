@@ -1,5 +1,8 @@
+from __future__ import annotations
+
+from typing import Optional, Any, Dict
+
 from authlib.integrations.starlette_client import OAuth
-from typing import Optional
 
 from oauth_tester.settings import get_settings
 
@@ -7,10 +10,12 @@ from oauth_tester.settings import get_settings
 oauth = OAuth()
 
 
-def register_oidc_client(name: Optional[str] = None) -> None:
-    """Register an OIDC client with Authlib.
+def register_client(name: Optional[str] = None) -> None:
+    """Register an OAuth/OIDC client with Authlib.
 
-    Uses discovery when available; otherwise falls back to manual endpoints.
+    - If `OIDC_DISCOVERY_URL` is set, uses discovery to configure endpoints.
+    - Otherwise, uses manual endpoints from settings (authorize/token/userinfo).
+    - For non-OIDC providers (e.g., Threads), configures token auth as client_secret_post.
     """
     s = get_settings()
     provider = name or s.oauth.provider_name
@@ -28,7 +33,7 @@ def register_oidc_client(name: Optional[str] = None) -> None:
         if s.oauth.userinfo_endpoint:
             metadata_args["userinfo_endpoint"] = s.oauth.userinfo_endpoint
 
-    client_kwargs = {
+    client_kwargs: Dict[str, Any] = {
         "scope": s.oauth.scopes,
     }
     # For Threads/Meta and many non-OIDC providers, the token endpoint expects
@@ -44,3 +49,26 @@ def register_oidc_client(name: Optional[str] = None) -> None:
         client_kwargs=client_kwargs,
         **metadata_args,
     )
+
+
+def get_oauth_client(name: Optional[str] = None):
+    """Return a registered OAuth client, registering on-demand if missing.
+
+    Intended for use as a FastAPI dependency.
+    """
+    s = get_settings()
+    provider = name or s.oauth.provider_name
+    client = oauth.create_client(provider)
+    if client is None:
+        register_client(provider)
+        client = oauth.create_client(provider)
+    if client is None:
+        # Lazy import to avoid a top-level FastAPI dependency
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=500, detail="OAuth client registration failed")
+    return client
+
+
+# Backward-compat alias if referenced elsewhere
+register_oidc_client = register_client

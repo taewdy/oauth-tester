@@ -12,6 +12,8 @@
       code { user-select: all; }
       button { padding: 0.5rem 0.75rem; }
       .muted { color: #666; font-size: 0.9rem; }
+      .actions { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+      .ok { color: #0a0; font-size: .9rem; display: none; }
     </style>
   </head>
   <body>
@@ -35,6 +37,10 @@
       {% if id_token %}
         <div class="card">
           <h3>ID Token (JWT)</h3>
+          <div class="actions">
+            <button type="button" data-copy-target="#id-token">Copy ID Token</button>
+            <span class="ok" id="copied-id">Copied!</span>
+          </div>
           <textarea readonly id="id-token">{{ id_token }}</textarea>
           <div class="muted">Copy and paste into jwt.io or similar to inspect.</div>
         </div>
@@ -42,21 +48,68 @@
       {% if access_token %}
       <div class="card">
         <h3>Access Token</h3>
+        <div class="actions">
+          <button type="button" data-copy-target="#access-token">Copy Access Token</button>
+          <span class="ok" id="copied-access">Copied!</span>
+        </div>
         <textarea readonly id="access-token">{{ access_token }}</textarea>
       </div>
       {% endif %}
       {% if claims_json %}
       <div class="card">
         <h3>Parsed ID Token Claims</h3>
+        <div class="actions">
+          <button type="button" data-copy-target="#claims">Copy Claims JSON</button>
+          <span class="ok" id="copied-claims">Copied!</span>
+        </div>
         <pre id="claims">{{ claims_json }}</pre>
       </div>
       {% endif %}
       {% if request.session.get('profile') %}
       <div class="card">
         <h3>User Profile</h3>
+        <div class="actions">
+          <button type="button" data-copy-target="#profile">Copy Profile JSON</button>
+          <span class="ok" id="copied-profile">Copied!</span>
+        </div>
         <pre id="profile">{{ request.session.get('profile') | tojson(indent=2) }}</pre>
       </div>
       {% endif %}
     {% endif %}
+    <script>
+      (function(){
+        function copyText(selector, okSel){
+          var el = document.querySelector(selector);
+          if(!el) return;
+          var text = el.value || el.innerText || '';
+          function done(){
+            var ok = okSel && document.querySelector(okSel);
+            if(ok){ ok.style.display='inline'; setTimeout(function(){ ok.style.display='none'; }, 1200); }
+          }
+          if(navigator.clipboard && window.isSecureContext){
+            navigator.clipboard.writeText(text).then(done).catch(function(){ fallback(); });
+          } else {
+            fallback();
+          }
+          function fallback(){
+            var range = document.createRange();
+            range.selectNodeContents(el);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            try { document.execCommand('copy'); } catch(e) {}
+            sel.removeAllRanges();
+            done();
+          }
+        }
+        document.addEventListener('click', function(e){
+          var btn = e.target.closest('button[data-copy-target]');
+          if(!btn) return;
+          var target = btn.getAttribute('data-copy-target');
+          var ok = btn.nextElementSibling && btn.nextElementSibling.classList.contains('ok') ? ('#'+btn.nextElementSibling.id) : null;
+          copyText(target, ok);
+        });
+      })();
+    </script>
   </body>
   </html>

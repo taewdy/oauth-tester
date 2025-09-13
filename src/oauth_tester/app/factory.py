@@ -4,8 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from oauth_tester.settings import get_settings
-from oauth_tester.routes import auth_router, system_router
-from oauth_tester.middleware.request_id import RequestIDMiddleware
+from oauth_tester.api import auth_router, system_router
+from oauth_tester.app.request_id import RequestIDMiddleware
 from oauth_tester.app.exceptions import register_exception_handlers
 from oauth_tester.app.logging_config import configure_logging
 from oauth_tester.app.metrics import instrument_metrics

@@ -1,68 +1,67 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from oauth_tester.settings import get_settings
-from oauth_tester.oauth_client import oauth, register_oidc_client
-from oauth_tester.security import (
+from oauth_tester.clients.oauth import oauth, get_oauth_client
+from oauth_tester.app.security import (
     generate_state,
     generate_nonce,
     generate_code_verifier,
     code_challenge_s256,
     compute_appsecret_proof,
 )
-from oauth_tester.jwt_utils import verify_id_token
+from oauth_tester.app.jwt import verify_id_token
+from authlib.integrations.base_client.errors import OAuthError
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Session keys
+STATE_KEY = "oauth_state"
+NONCE_KEY = "oauth_nonce"
+VERIFIER_KEY = "code_verifier"
 
-def get_oauth_client():
-    """Resolve or register the OAuth client and return it.
 
-    This is idempotent and avoids relying on internal registry details.
-    """
+def _redirect_uri() -> str:
     s = get_settings()
-    client = oauth.create_client(s.oauth.provider_name)
-    if client is None:
-        register_oidc_client()
-        client = oauth.create_client(s.oauth.provider_name)
-    if client is None:
-        raise HTTPException(status_code=500, detail="OAuth client registration failed")
-    return client
+    return f"{s.oauth.base_url}{s.oauth.redirect_path}"
+
+
+def _build_authorize_kwargs(s, state: str) -> tuple[Dict[str, Any], Optional[str]]:
+    """Build parameters for authorize_redirect and return (kwargs, code_verifier)."""
+    kwargs: Dict[str, Any] = {"redirect_uri": _redirect_uri(), "state": state}
+
+    # OIDC-only nonce
+    include_nonce = bool(s.oauth.oidc_discovery_url or s.oauth.jwks_url)
+    if include_nonce:
+        kwargs["nonce"] = generate_nonce()
+
+    code_verifier: Optional[str] = None
+    if s.oauth.use_pkce:
+        code_verifier = generate_code_verifier()
+        kwargs["code_challenge"] = code_challenge_s256(code_verifier)
+        kwargs["code_challenge_method"] = "S256"
+
+    return kwargs, code_verifier
 
 
 @router.get("/login")
 async def login(request: Request, client = Depends(get_oauth_client)):
     s = get_settings()
     state = generate_state()
-    # Only include nonce for OIDC flows
-    include_nonce = bool(s.oauth.oidc_discovery_url or s.oauth.jwks_url)
-    nonce = generate_nonce() if include_nonce else None
-    code_verifier = None
-    code_challenge = None
-    if s.oauth.use_pkce:
-        code_verifier = generate_code_verifier()
-        code_challenge = code_challenge_s256(code_verifier)
+    kwargs, code_verifier = _build_authorize_kwargs(s, state)
 
-    request.session.update(
-        {
-            "oauth_state": state,
-            "oauth_nonce": nonce,
-            "code_verifier": code_verifier,
-        }
-    )
+    # Persist minimal state needed for callback validation
+    request.session[STATE_KEY] = state
+    if "nonce" in kwargs:
+        request.session[NONCE_KEY] = kwargs["nonce"]
+    if code_verifier:
+        request.session[VERIFIER_KEY] = code_verifier
 
-    redirect_uri = f"{s.oauth.base_url}{s.oauth.redirect_path}"
-    kwargs = dict(redirect_uri=redirect_uri, state=state)
-    if nonce:
-        kwargs["nonce"] = nonce
-    if code_challenge:
-        kwargs["code_challenge"] = code_challenge
-        kwargs["code_challenge_method"] = "S256"
     return await client.authorize_redirect(request, **kwargs)
 
 
@@ -81,13 +80,21 @@ async def callback(request: Request, client = Depends(get_oauth_client)):
 
     # Validate state
     state_param = request.query_params.get("state")
-    if not state_param or state_param != request.session.get("oauth_state"):
+    if not state_param or state_param != request.session.get(STATE_KEY):
         raise HTTPException(status_code=400, detail="Invalid state (check cookie SameSite/HTTPS)")
 
-    token = await client.authorize_access_token(
-        request,
-        code_verifier=request.session.get("code_verifier") if s.oauth.use_pkce else None,
-    )
+    try:
+        token = await client.authorize_access_token(
+            request,
+            code_verifier=request.session.get(VERIFIER_KEY) if s.oauth.use_pkce else None,
+        )
+    except OAuthError as e:
+        # Surface token exchange errors nicely on the UI
+        request.session["auth_error"] = {
+            "error": getattr(e, "error", None) or "oauth_error",
+            "error_description": getattr(e, "description", None) or str(e),
+        }
+        return RedirectResponse(url="/")
 
     id_token = token.get("id_token")
     access_token = token.get("access_token")
@@ -98,7 +105,7 @@ async def callback(request: Request, client = Depends(get_oauth_client)):
     is_oidc = bool(s.oauth.oidc_discovery_url or s.oauth.jwks_url)
     if is_oidc and id_token:
         try:
-            maybe_claims = client.parse_id_token(token, nonce=request.session.get("oauth_nonce"))
+            maybe_claims = client.parse_id_token(token, nonce=request.session.get(NONCE_KEY))
             if hasattr(maybe_claims, "__await__"):
                 claims = await maybe_claims  # type: ignore[func-returns-value]
             else:
@@ -129,14 +136,19 @@ async def callback(request: Request, client = Depends(get_oauth_client)):
         except Exception:
             profile = None
 
-    request.session.update(
-        {
-            "id_token": id_token,
-            "access_token": access_token,
-            "claims": dict(claims) if isinstance(claims, dict) else None,
-            "profile": dict(profile) if profile else None,
-        }
-    )
+    # Rotate transient values and persist results
+    for k in (STATE_KEY, NONCE_KEY, VERIFIER_KEY):
+        if k in request.session:
+            request.session.pop(k)
+
+    if id_token:
+        request.session["id_token"] = id_token
+    if access_token:
+        request.session["access_token"] = access_token
+    if isinstance(claims, dict):
+        request.session["claims"] = claims
+    if profile:
+        request.session["profile"] = profile
 
     return RedirectResponse(url="/")
 
