@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from oauth_tester.settings import get_settings
-from oauth_tester.clients.oauth import oauth, get_oauth_client
+from oauth_tester.clients import get_oauth_client
+from oauth_tester.clients.types import OAuthClient
 from oauth_tester.app.security import (
     generate_state,
     generate_nonce,
@@ -16,6 +17,7 @@ from oauth_tester.app.security import (
 )
 from oauth_tester.app.jwt import verify_id_token
 from authlib.integrations.base_client.errors import OAuthError
+from oauth_tester.clients.threads_tokens import ThreadsTokenService, ThreadsTokenError
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -50,7 +52,7 @@ def _build_authorize_kwargs(s, state: str) -> tuple[Dict[str, Any], Optional[str
 
 
 @router.get("/login")
-async def login(request: Request, client = Depends(get_oauth_client)):
+async def login(request: Request, client: OAuthClient = Depends(get_oauth_client)):
     s = get_settings()
     state = generate_state()
     kwargs, code_verifier = _build_authorize_kwargs(s, state)
@@ -66,7 +68,7 @@ async def login(request: Request, client = Depends(get_oauth_client)):
 
 
 @router.get("/callback")
-async def callback(request: Request, client = Depends(get_oauth_client)):
+async def callback(request: Request, client: OAuthClient = Depends(get_oauth_client)):
     s = get_settings()
 
     # Provider sign-in error
@@ -150,6 +152,22 @@ async def callback(request: Request, client = Depends(get_oauth_client)):
     if profile:
         request.session["profile"] = profile
 
+    # Optionally auto-exchange for a long-lived token for Threads provider
+    if s.oauth.provider_name.lower() == "threads" and s.oauth.auto_exchange_long_lived and access_token:
+        try:
+            service = ThreadsTokenService()
+            long = await service.exchange_long_lived(access_token)
+            request.session["long_access_token"] = long.access_token
+            request.session["long_token_type"] = long.token_type
+            request.session["long_expires_in"] = long.expires_in
+        except ThreadsTokenError as e:
+            # Do not fail the flow; store error to display
+            request.session["auth_error"] = {
+                "error": "long_token_exchange_failed",
+                "error_description": str(e),
+                "status_code": getattr(e, "status_code", None),
+            }
+
     return RedirectResponse(url="/")
 
 
@@ -157,4 +175,53 @@ async def callback(request: Request, client = Depends(get_oauth_client)):
 @router.get("/logout")
 async def logout(request: Request):
     request.session.clear()
+    return RedirectResponse(url="/")
+
+
+@router.post("/long-token/exchange")
+async def exchange_long_token(request: Request):
+    s = get_settings()
+    if s.oauth.provider_name.lower() != "threads":
+        raise HTTPException(status_code=400, detail="Long-lived exchange only supported for Threads")
+    access_token = request.session.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=400, detail="No short-lived access token in session")
+    try:
+        service = ThreadsTokenService()
+        long = await service.exchange_long_lived(access_token)
+        request.session["long_access_token"] = long.access_token
+        request.session["long_token_type"] = long.token_type
+        request.session["long_expires_in"] = long.expires_in
+        # Clear any previous error
+        request.session.pop("auth_error", None)
+    except ThreadsTokenError as e:
+        request.session["auth_error"] = {
+            "error": "long_token_exchange_failed",
+            "error_description": str(e),
+            "status_code": getattr(e, "status_code", None),
+        }
+    return RedirectResponse(url="/")
+
+
+@router.post("/long-token/refresh")
+async def refresh_long_token(request: Request):
+    s = get_settings()
+    if s.oauth.provider_name.lower() != "threads":
+        raise HTTPException(status_code=400, detail="Long-lived refresh only supported for Threads")
+    long_token = request.session.get("long_access_token")
+    if not long_token:
+        raise HTTPException(status_code=400, detail="No long-lived token in session")
+    try:
+        service = ThreadsTokenService()
+        refreshed = await service.refresh_long_lived(long_token)
+        request.session["long_access_token"] = refreshed.access_token
+        request.session["long_token_type"] = refreshed.token_type
+        request.session["long_expires_in"] = refreshed.expires_in
+        request.session.pop("auth_error", None)
+    except ThreadsTokenError as e:
+        request.session["auth_error"] = {
+            "error": "long_token_refresh_failed",
+            "error_description": str(e),
+            "status_code": getattr(e, "status_code", None),
+        }
     return RedirectResponse(url="/")

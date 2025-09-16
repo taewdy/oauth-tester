@@ -8,3 +8,9 @@ provider will be Thread and we need locally https as Thread doesn't allow us to 
 hey, why didn't you use src folder, rename src/photos-api to match our service, this is scaffold project, so use the existing project and use it by renaming them
 
 Note: should have said that study README.md and existing project structure before you start and then rename it and use it
+
+## Get long lived token
+
+refer to `/Users/universe/project/thrubble-web/docs/reference/threads`
+- Now on top of current implementation of getting short lived token, we need to get long lived token
+- Show me plan how you will do it

@@ -158,3 +158,31 @@ If the request is malformed in some way, the API will return an error.
   "code": 400,
   "error_message": "Matching code was not found or was already used"
 }
+
+---
+
+# Long-Lived Tokens (Threads)
+
+Short-lived tokens (1 hour) can be exchanged for long-lived tokens (60 days) and refreshed before expiry.
+
+Server-only: these calls include your app secret and must be performed on the backend.
+
+Endpoints per Meta docs:
+- Exchange: `GET https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=APP_SECRET&access_token=SHORT_TOKEN`
+- Refresh: `GET https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=LONG_TOKEN`
+
+In this app:
+- Configure via `.env`:
+  - `OAUTH_TESTER_OAUTH__THREADS_GRAPH_BASE_URL` (default `https://graph.threads.net`)
+  - `OAUTH_TESTER_OAUTH__AUTO_EXCHANGE_LONG_LIVED` (default `false`)
+- Manual actions on UI:
+  - After login, click “Exchange for Long-Lived Token” to get a 60-day token.
+  - When a long-lived token is present, click “Refresh Long-Lived Token” to extend it.
+- Programmatic endpoints:
+  - `POST /auth/long-token/exchange` — exchanges the short-lived token in session.
+  - `POST /auth/long-token/refresh` — refreshes the long-lived token in session.
+
+Implementation details:
+- Service: `oauth_tester.clients.threads_tokens.ThreadsTokenService`
+- Session keys: `long_access_token`, `long_token_type`, `long_expires_in`
+- Errors are captured to the existing `auth_error` panel on the index page.

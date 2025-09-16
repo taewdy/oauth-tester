@@ -26,6 +26,11 @@ dev = [
   "pytest==8.3.2",
   "pytest-asyncio==0.23.8",
   "respx==0.21.1",
+  "ruff==0.6.4",
+  "flake8==7.1.1",
+  "mypy==1.11.2",
+  "black==24.8.0",
+  "isort==5.13.2",
 ]
 
 [project.scripts]
@@ -41,3 +46,39 @@ packages = ["src/oauth_tester"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/oauth_tester", "README.md", "pyproject.toml", "Makefile", "Dockerfile"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes (unused imports/vars, etc.)
+  "I",   # isort (import sorting)
+  "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+show_error_codes = true
+warn_unused_configs = true
+pretty = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+  "authlib.*",
+]
+ignore_missing_imports = true

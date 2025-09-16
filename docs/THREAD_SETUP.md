@@ -70,3 +70,13 @@ Browsers warn on self-signed certs. Use one of these approaches:
   - Linux: system-specific; for Chrome-based, you can import in System/Browser cert store; for Firefox (NSS): `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n localhost -i certs/localhost.crt`
 
 After trusting the cert, reload `https://localhost:8000` and the warning should disappear.
+
+## Long-Lived Tokens (Threads)
+
+- Enable automatic exchange after login (optional):
+  - `OAUTH_TESTER_OAUTH__AUTO_EXCHANGE_LONG_LIVED=true`
+- Manual actions on the index page:
+  - “Exchange for Long-Lived Token” turns a short-lived token into a 60-day token.
+  - “Refresh Long-Lived Token” extends an existing long-lived token.
+- Configure the Graph base URL if needed:
+  - `OAUTH_TESTER_OAUTH__THREADS_GRAPH_BASE_URL=https://graph.threads.net`

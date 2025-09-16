@@ -1,4 +1,4 @@
-.PHONY: help install install-dev run test lint format type-check clean build all
+.PHONY: help install install-dev run test lint lint-ruff format type-check clean build all
 
 # Default target
 help:
@@ -10,7 +10,8 @@ help:
 	@echo "  certs-mkcert - Generate locally trusted certs via mkcert"
 	@echo "  run-prod     - Run the server using app settings"
 	@echo "  test         - Run tests"
-	@echo "  lint         - Run all linting tools (format, type-check)"
+	@echo "  lint         - Run all linting tools (ruff, format-check, type-check)"
+	@echo "  lint-ruff    - Run ruff (lint + format)"
 	@echo "  format       - Format code with black and isort"
 	@echo "  type-check   - Run mypy type checking"
 	@echo "  clean        - Clean build artifacts and cache"
@@ -74,7 +75,12 @@ type-check:
 	uv run mypy src/
 
 # Run all linting tools
-lint: format-check type-check
+lint: lint-ruff format-check type-check
+
+# Ruff lint (auto-fix safe rules and format)
+lint-ruff:
+	uv run ruff check --fix .
+	uv run ruff format .
 
 # Run all linting tools and fix issues where possible
 lint-fix: format type-check

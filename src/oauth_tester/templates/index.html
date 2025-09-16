@@ -55,6 +55,29 @@
         <textarea readonly id="access-token">{{ access_token }}</textarea>
       </div>
       {% endif %}
+      {% if request.session.get('long_access_token') %}
+      <div class="card">
+        <h3>Long-Lived Access Token</h3>
+        <div class="actions">
+          <button type="button" data-copy-target="#long-access-token">Copy Long-Lived Token</button>
+          <span class="ok" id="copied-long">Copied!</span>
+        </div>
+        <textarea readonly id="long-access-token">{{ request.session.get('long_access_token') }}</textarea>
+        {% if request.session.get('long_expires_in') %}
+        <div class="muted">Expires in: {{ request.session.get('long_expires_in') }} seconds</div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if access_token and not request.session.get('long_access_token') %}
+      <div class="row">
+        <form action="/auth/long-token/exchange" method="post"><button>Exchange for Long-Lived Token</button></form>
+      </div>
+      {% endif %}
+      {% if request.session.get('long_access_token') %}
+      <div class="row">
+        <form action="/auth/long-token/refresh" method="post"><button>Refresh Long-Lived Token</button></form>
+      </div>
+      {% endif %}
       {% if claims_json %}
       <div class="card">
         <h3>Parsed ID Token Claims</h3>

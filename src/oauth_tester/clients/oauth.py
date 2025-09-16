@@ -5,6 +5,7 @@ from typing import Optional, Any, Dict
 from authlib.integrations.starlette_client import OAuth
 
 from oauth_tester.settings import get_settings
+from oauth_tester.clients.types import OAuthClient
 
 
 oauth = OAuth()
@@ -51,14 +52,14 @@ def register_client(name: Optional[str] = None) -> None:
     )
 
 
-def get_oauth_client(name: Optional[str] = None):
+def get_oauth_client(name: Optional[str] = None) -> OAuthClient:
     """Return a registered OAuth client, registering on-demand if missing.
 
     Intended for use as a FastAPI dependency.
     """
     s = get_settings()
     provider = name or s.oauth.provider_name
-    client = oauth.create_client(provider)
+    client: Optional[OAuthClient] = oauth.create_client(provider)
     if client is None:
         register_client(provider)
         client = oauth.create_client(provider)

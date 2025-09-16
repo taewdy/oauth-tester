@@ -68,6 +68,12 @@ class OAuthSettings(BaseModel):
     use_pkce: bool = False  # Threads docs do not require PKCE
     compute_appsecret_proof: bool = False  # Only for providers that require it
 
+    # Threads Graph API base (for long-lived token exchange/refresh)
+    threads_graph_base_url: HttpUrl = HttpUrl("https://graph.threads.net")
+
+    # Automatically exchange short-lived tokens for long-lived tokens on callback
+    auto_exchange_long_lived: bool = True
+
     # Sessions/crypto
     secret_key: str = "dev-secret-change-me"
     session_cookie_name: str = "oauth_tester_session"
