@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 
 from oauth_tester.settings import get_settings
 from oauth_tester.clients import get_oauth_client
+from oauth_tester.clients.oauth import OAuthClientError
 from oauth_tester.clients.types import OAuthClient
 from oauth_tester.app.security import (
     generate_state,
@@ -16,7 +17,6 @@ from oauth_tester.app.security import (
     compute_appsecret_proof,
 )
 from oauth_tester.app.jwt import verify_id_token
-from authlib.integrations.base_client.errors import OAuthError
 from oauth_tester.clients.threads_tokens import ThreadsTokenService, ThreadsTokenError
 
 
@@ -34,8 +34,12 @@ def _redirect_uri() -> str:
 
 
 def _build_authorize_kwargs(s, state: str) -> tuple[Dict[str, Any], Optional[str]]:
-    """Build parameters for authorize_redirect and return (kwargs, code_verifier)."""
-    kwargs: Dict[str, Any] = {"redirect_uri": _redirect_uri(), "state": state}
+    """Build authorization parameters and return (params, code_verifier)."""
+    kwargs: Dict[str, Any] = {
+        "redirect_uri": _redirect_uri(),
+        "state": state,
+        "scope": s.oauth.scopes,
+    }
 
     # OIDC-only nonce
     include_nonce = bool(s.oauth.oidc_discovery_url or s.oauth.jwks_url)
@@ -64,7 +68,15 @@ async def login(request: Request, client: OAuthClient = Depends(get_oauth_client
     if code_verifier:
         request.session[VERIFIER_KEY] = code_verifier
 
-    return await client.authorize_redirect(request, **kwargs)
+    authorize_url = await client.build_authorization_url(
+        redirect_uri=kwargs["redirect_uri"],
+        state=kwargs["state"],
+        scope=kwargs["scope"],
+        nonce=kwargs.get("nonce"),
+        code_challenge=kwargs.get("code_challenge"),
+        code_challenge_method=kwargs.get("code_challenge_method"),
+    )
+    return RedirectResponse(url=authorize_url)
 
 
 @router.get("/callback")
@@ -85,17 +97,26 @@ async def callback(request: Request, client: OAuthClient = Depends(get_oauth_cli
     if not state_param or state_param != request.session.get(STATE_KEY):
         raise HTTPException(status_code=400, detail="Invalid state (check cookie SameSite/HTTPS)")
 
+    code_param = request.query_params.get("code")
+    if not code_param:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
     try:
-        token = await client.authorize_access_token(
-            request,
+        token = await client.exchange_code(
+            code=code_param,
+            redirect_uri=_redirect_uri(),
             code_verifier=request.session.get(VERIFIER_KEY) if s.oauth.use_pkce else None,
         )
-    except OAuthError as e:
+    except OAuthClientError as e:
         # Surface token exchange errors nicely on the UI
-        request.session["auth_error"] = {
-            "error": getattr(e, "error", None) or "oauth_error",
-            "error_description": getattr(e, "description", None) or str(e),
+        error_payload: Dict[str, Any] = {
+            "error": e.error or "oauth_error",
+            "error_description": e.description or str(e),
+            "status_code": e.status_code,
         }
+        if e.details:
+            error_payload["details"] = e.details
+        request.session["auth_error"] = error_payload
         return RedirectResponse(url="/")
 
     id_token = token.get("id_token")
@@ -107,22 +128,23 @@ async def callback(request: Request, client: OAuthClient = Depends(get_oauth_cli
     is_oidc = bool(s.oauth.oidc_discovery_url or s.oauth.jwks_url)
     if is_oidc and id_token:
         try:
-            maybe_claims = client.parse_id_token(token, nonce=request.session.get(NONCE_KEY))
-            if hasattr(maybe_claims, "__await__"):
-                claims = await maybe_claims  # type: ignore[func-returns-value]
-            else:
-                claims = maybe_claims  # type: ignore[assignment]
-        except Exception:
-            # Fallback to manual JWKS verification if configured
-            if s.oauth.jwks_url:
+            claims = await client.parse_id_token(
+                token_response=token,
+                nonce=request.session.get(NONCE_KEY),
+            )
+        except OAuthClientError:
+            jwks_url = await client.jwks_uri()
+            if jwks_url:
                 claims = await verify_id_token(
                     id_token,
-                    jwks_url=s.oauth.jwks_url,
+                    jwks_url=jwks_url,
                     audience=s.oauth.client_id,
+                    issuer=await client.issuer(),
                 )
 
     # Non-OIDC providers: try to fetch user profile if configured
-    if not claims and access_token and s.oauth.userinfo_endpoint:
+    userinfo_endpoint = await client.userinfo_endpoint()
+    if not claims and access_token and userinfo_endpoint:
         import httpx
 
         params: Dict[str, Any] = {"access_token": access_token}
@@ -132,7 +154,7 @@ async def callback(request: Request, client: OAuthClient = Depends(get_oauth_cli
             params["appsecret_proof"] = compute_appsecret_proof(access_token, s.oauth.client_secret)
         try:
             async with httpx.AsyncClient(timeout=10) as client_http:
-                resp = await client_http.get(str(s.oauth.userinfo_endpoint), params=params)
+                resp = await client_http.get(str(userinfo_endpoint), params=params)
                 if resp.status_code < 300:
                     profile = resp.json()
         except Exception:

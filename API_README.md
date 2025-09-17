@@ -13,7 +13,7 @@ src/oauth_tester/
 ├── app/              # FastAPI application factory (CORS, sessions, routing)
 ├── routes/           # /auth login/callback/logout
 ├── templates/        # Minimal Jinja UI to display tokens/claims
-├── oauth_client.py   # Authlib OAuth client registration (discovery/manual)
+├── oauth_client.py   # Manual OAuth client built on httpx (discovery/manual)
 ├── jwt_utils.py      # JWKS fetch + JWT validation helpers
 ├── security.py       # PKCE/state/nonce helpers
 ├── settings/         # Typed settings via pydantic-settings

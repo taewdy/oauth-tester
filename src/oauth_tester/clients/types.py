@@ -1,18 +1,45 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Protocol
-
-from starlette.requests import Request
-from starlette.responses import Response
+from typing import Any, Dict, Mapping, Protocol
 
 
 class OAuthClient(Protocol):
-    async def authorize_redirect(self, request: Request, **params: Any) -> Response:
+    async def build_authorization_url(
+        self,
+        *,
+        redirect_uri: str,
+        state: str,
+        scope: str,
+        nonce: str | None = None,
+        code_challenge: str | None = None,
+        code_challenge_method: str | None = None,
+        extra_params: Mapping[str, Any] | None = None,
+    ) -> str:
         ...
 
-    async def authorize_access_token(self, request: Request, **params: Any) -> Mapping[str, Any]:
+    async def exchange_code(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        code_verifier: str | None = None,
+    ) -> Mapping[str, Any]:
         ...
 
-    def parse_id_token(self, token: Mapping[str, Any], **params: Any) -> Any:
+    async def parse_id_token(
+        self,
+        *,
+        token_response: Mapping[str, Any],
+        nonce: str | None = None,
+    ) -> Dict[str, Any]:
+        ...
+
+    async def userinfo_endpoint(self) -> str | None:
+        ...
+
+    async def jwks_uri(self) -> str | None:
+        ...
+
+    async def issuer(self) -> str | None:
         ...
 

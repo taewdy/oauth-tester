@@ -14,3 +14,11 @@ Note: should have said that study README.md and existing project structure befor
 refer to `/Users/universe/project/thrubble-web/docs/reference/threads`
 - Now on top of current implementation of getting short lived token, we need to get long lived token
 - Show me plan how you will do it
+
+
+## Diagram
+
+Draw sequence diagram for oauth flow we've implemented in this project, write that in docs/oauth-flow.md
+
+Seems we are using starlette_client for oauth client, however, I prefer to use standard library. Can we make change so that we just use httpx and do oauth flow manually without using starlette_client?
+If so, update code and docs/oauth-flow.md

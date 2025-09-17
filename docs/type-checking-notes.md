@@ -3,10 +3,10 @@
 This document captures the key decisions we made while wiring up type safety for the
 OAuth client integration.
 
-## Authlib Client Typing
-- FastAPI injects the Authlib client into the auth routes. Authlib returns an object that
-  behaves like `StarletteOAuth2App`, exposing methods such as `authorize_redirect` and
-  `authorize_access_token`.
+## Manual OAuth Client Typing
+- FastAPI injects the custom `HttpOAuthClient` into the auth routes. The implementation
+  wraps `httpx` calls and exposes async methods such as `build_authorization_url`,
+  `exchange_code`, and `parse_id_token`.
 - Instead of relying on that concrete class, we define an `OAuthClient` `Protocol` that
   describes only the methods the routes consume. `get_oauth_client` advertises the
   protocol, and the handlers depend on it, which keeps the production code free of casts
@@ -20,11 +20,11 @@ OAuth client integration.
 - Configuration highlights:
   - Python 3.11 target and the `pydantic.mypy` plugin so models continue to type-check.
   - `disallow_untyped_defs` and `check_untyped_defs` enforce explicit annotations.
-  - `authlib.*` modules are ignored for missing type hints (Authlib does not ship stub
-    files).
+  - Third-party modules without stubs (e.g., `httpx`) are covered by type hints shipped
+    with the library.
 - Run locally via `uv run mypy src/` or `make type-check`.
 
-- **Protocol vs casts** – We briefly guarded the Authlib client with `isinstance`
+- **Protocol vs casts** – We briefly guarded concrete clients with `isinstance`
   checks plus `cast`, but that adds runtime logic purely for the type checker. Defining a
   protocol avoids the guard and keeps the dependency surface explicit. If we ever need
   broader coverage, stub files remain an option.
